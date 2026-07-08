@@ -1,0 +1,50 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Silkscreen:wght@400;700&family=Press+Start+2P&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", "Inter", system-ui, -apple-system, sans-serif;
+  --font-pixel: "Press Start 2P", "Silkscreen", monospace;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+
+  /* Custom pixel-brand theme variables */
+  --color-pixelitos-yellow: #f0da4c;
+  --color-pixelitos-yellow-dark: #d9c22e;
+  --color-pixelitos-yellow-light: #fdf5b4;
+  --color-pixel-purple: #7c3aed;
+  --color-pixel-dark: #0f172a;
+  --color-pixel-card: #1e293b;
+  --color-scratch: #ff8c1a;
+  --color-kahoot: #46178f;
+  --color-roblox: #111827;
+  --color-microbit: #00a896;
+  --color-codeorg: #00adbc;
+  --color-tynker: #e11d48;
+  --color-pilas: #2563eb;
+}
+
+/* Custom scrollbars for a neat look */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Animations and transitions */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .95; transform: scale(0.99); }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 4s infinite ease-in-out;
+}
