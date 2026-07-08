@@ -1,0 +1,6 @@
+{
+  "name": "Pixelitos Hub",
+  "description": "Portal centralizado para que docentes y coordinadoras de Pixelitos organicen, visualicen y gestionen recursos, proyectos y desafíos de Scratch, Roblox, Kahoot y más.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
