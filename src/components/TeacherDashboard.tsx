@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, Plus, Trash2, Key, Edit, Save, X, Search, Sparkles, ShieldCheck } from 'lucide-react';
 import { LevelType, StudentProfile, TeacherProfile } from '../types';
 
@@ -8,6 +8,21 @@ interface TeacherDashboardProps {
 }
 
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onStudentsChanged, userRole }) => {
+  if (userRole === 'alumno') {
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-6 rounded-2xl flex items-start gap-4 max-w-xl mx-auto my-12 shadow-xs animate-fade-in">
+        <ShieldCheck className="w-8 h-8 text-red-600 shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <h4 className="font-sans font-black uppercase tracking-wider text-red-800 text-sm">Acceso Denegado 🔐</h4>
+          <p className="font-sans text-red-600 leading-relaxed font-semibold">
+            No tenés permisos para visualizar o administrar la sección de Alumnos/Dashboard. 
+            Esta área está reservada exclusivamente para el personal docente y administrativo de Pixelitos.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const [students, setStudents] = useState<StudentProfile[]>(() => {
     const saved = localStorage.getItem('pixelitos_students');
     if (saved) {
@@ -99,15 +114,64 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onStudentsCh
   const [editTeacherPassword, setEditTeacherPassword] = useState('');
   const [editTeacherNotes, setEditTeacherNotes] = useState('');
 
-  const saveTeachers = (updatedList: TeacherProfile[]) => {
+  // Fetch students and teachers from Neon DB on mount
+  useEffect(() => {
+    fetch('/api/students')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setStudents(data);
+        }
+      })
+      .catch((err) => console.error('Error fetching students from DB:', err));
+
+    fetch('/api/teachers')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setTeachers(data);
+        }
+      })
+      .catch((err) => console.error('Error fetching teachers from DB:', err));
+  }, []);
+
+  const saveTeachers = (updatedList: TeacherProfile[], teacherToUpsert?: TeacherProfile, teacherIdToDelete?: string) => {
     setTeachers(updatedList);
     localStorage.setItem('pixelitos_teachers', JSON.stringify(updatedList));
+
+    if (teacherToUpsert) {
+      fetch('/api/teachers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(teacherToUpsert),
+      }).catch((err) => console.error('Error saving teacher to DB:', err));
+    }
+
+    if (teacherIdToDelete) {
+      fetch(`/api/teachers/${teacherIdToDelete}`, {
+        method: 'DELETE',
+      }).catch((err) => console.error('Error deleting teacher from DB:', err));
+    }
   };
 
-  const saveStudents = (updatedList: StudentProfile[]) => {
+  const saveStudents = (updatedList: StudentProfile[], studentToUpsert?: StudentProfile, studentIdToDelete?: string) => {
     setStudents(updatedList);
     localStorage.setItem('pixelitos_students', JSON.stringify(updatedList));
     if (onStudentsChanged) onStudentsChanged();
+
+    if (studentToUpsert) {
+      fetch('/api/students', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(studentToUpsert),
+      }).catch((err) => console.error('Error saving student to DB:', err));
+    }
+
+    if (studentIdToDelete) {
+      fetch(`/api/students/${studentIdToDelete}`, {
+        method: 'DELETE',
+      }).catch((err) => console.error('Error deleting student from DB:', err));
+    }
   };
 
   const handleCreateStudent = (e: React.FormEvent) => {
@@ -131,7 +195,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onStudentsCh
     };
 
     const updated = [newStudent, ...students];
-    saveStudents(updated);
+    saveStudents(updated, newStudent);
 
     // Reset Form
     setNewName('');
@@ -150,7 +214,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onStudentsCh
     }
     if (shouldDelete) {
       const updated = students.filter(s => s.id !== id);
-      saveStudents(updated);
+      saveStudents(updated, undefined, id);
     }
   };
 
@@ -162,18 +226,20 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onStudentsCh
   };
 
   const handleSaveEdit = (id: string) => {
+    let targetStudent: StudentProfile | undefined;
     const updated = students.map(s => {
       if (s.id === id) {
-        return {
+        targetStudent = {
           ...s,
           level: editLevel,
           password: editPassword.trim() || 'pixelitos123',
           notes: editNotes.trim() || undefined
         };
+        return targetStudent;
       }
       return s;
     });
-    saveStudents(updated);
+    saveStudents(updated, targetStudent);
     setEditingId(null);
   };
 
@@ -189,7 +255,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onStudentsCh
     };
 
     const updated = [newTeacher, ...teachers];
-    saveTeachers(updated);
+    saveTeachers(updated, newTeacher);
 
     // Reset Form
     setNewTeacherName('');
@@ -207,7 +273,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onStudentsCh
     }
     if (shouldDelete) {
       const updated = teachers.filter(t => t.id !== id);
-      saveTeachers(updated);
+      saveTeachers(updated, undefined, id);
     }
   };
 
@@ -219,18 +285,20 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onStudentsCh
   };
 
   const handleSaveEditTeacher = (id: string) => {
+    let targetTeacher: TeacherProfile | undefined;
     const updated = teachers.map(t => {
       if (t.id === id) {
-        return {
+        targetTeacher = {
           ...t,
           name: editTeacherName.trim(),
           password: editTeacherPassword.trim() || 'profe123',
           notes: editTeacherNotes.trim() || undefined
         };
+        return targetTeacher;
       }
       return t;
     });
-    saveTeachers(updated);
+    saveTeachers(updated, targetTeacher);
     setEditingTeacherId(null);
   };
 

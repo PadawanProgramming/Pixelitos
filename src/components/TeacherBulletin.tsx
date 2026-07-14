@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { MessageSquare, Pin, Plus, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { MessageSquare, Pin, Plus, Trash2, ShieldCheck } from 'lucide-react';
 
 interface BulletinMessage {
   id: string;
@@ -9,7 +9,25 @@ interface BulletinMessage {
   date: string;
 }
 
-export const TeacherBulletin: React.FC = () => {
+interface TeacherBulletinProps {
+  userRole?: string;
+}
+
+export const TeacherBulletin: React.FC<TeacherBulletinProps> = ({ userRole }) => {
+  if (userRole === 'alumno') {
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-6 rounded-2xl flex items-start gap-4 max-w-xl mx-auto my-12 shadow-xs animate-fade-in">
+        <ShieldCheck className="w-8 h-8 text-red-600 shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <h4 className="font-sans font-black uppercase tracking-wider text-red-800 text-sm">Acceso Denegado 🔐</h4>
+          <p className="font-sans text-red-600 leading-relaxed font-semibold">
+            No tenés permisos para visualizar la Pizarra del Staff. Esta sección está reservada exclusivamente para profesores y coordinadores de Pixelitos.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const [messages, setMessages] = useState<BulletinMessage[]>(() => {
     const saved = localStorage.getItem('pixelitos_bulletins');
     if (saved) {
@@ -56,9 +74,35 @@ export const TeacherBulletin: React.FC = () => {
   const [color, setColor] = useState<'yellow' | 'cyan' | 'green' | 'pink'>('yellow');
   const [showForm, setShowForm] = useState(false);
 
-  const saveMessages = (newMsgs: BulletinMessage[]) => {
+  // Fetch bulletins from Neon DB on mount
+  useEffect(() => {
+    fetch('/api/bulletins')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setMessages(data);
+        }
+      })
+      .catch((err) => console.error('Error fetching bulletins from DB:', err));
+  }, []);
+
+  const saveMessages = (newMsgs: BulletinMessage[], msgToUpsert?: BulletinMessage, msgIdToDelete?: string) => {
     setMessages(newMsgs);
     localStorage.setItem('pixelitos_bulletins', JSON.stringify(newMsgs));
+
+    if (msgToUpsert) {
+      fetch('/api/bulletins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(msgToUpsert),
+      }).catch((err) => console.error('Error saving bulletin to DB:', err));
+    }
+
+    if (msgIdToDelete) {
+      fetch(`/api/bulletins/${msgIdToDelete}`, {
+        method: 'DELETE',
+      }).catch((err) => console.error('Error deleting bulletin from DB:', err));
+    }
   };
 
   const handleAddMessage = (e: React.FormEvent) => {
@@ -74,7 +118,7 @@ export const TeacherBulletin: React.FC = () => {
     };
 
     const updated = [newMsg, ...messages];
-    saveMessages(updated);
+    saveMessages(updated, newMsg);
 
     setAuthor('');
     setText('');
@@ -83,7 +127,7 @@ export const TeacherBulletin: React.FC = () => {
 
   const handleDeleteMessage = (id: string) => {
     const updated = messages.filter((m) => m.id !== id);
-    saveMessages(updated);
+    saveMessages(updated, undefined, id);
   };
 
   const getColorClasses = (c: 'yellow' | 'cyan' | 'green' | 'pink') => {

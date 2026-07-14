@@ -127,13 +127,40 @@ export const AccountsSection: React.FC<AccountsSectionProps> = ({ userRole = 'ad
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<'user' | 'pass' | null>(null);
 
-  const saveAccounts = (newAccounts: Account[]) => {
+  // Fetch accounts from Neon DB on mount
+  React.useEffect(() => {
+    fetch('/api/accounts')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setAccounts(data);
+        }
+      })
+      .catch((err) => console.error('Error fetching accounts from DB:', err));
+  }, []);
+
+  const saveAccounts = (newAccounts: Account[], accountToUpsert?: Account, accountIdToDelete?: string) => {
     setAccounts(newAccounts);
     localStorage.setItem('pixelitos_accounts', JSON.stringify(newAccounts));
+
+    if (accountToUpsert) {
+      fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(accountToUpsert),
+      }).catch((err) => console.error('Error saving account to DB:', err));
+    }
+
+    if (accountIdToDelete) {
+      fetch(`/api/accounts/${accountIdToDelete}`, {
+        method: 'DELETE',
+      }).catch((err) => console.error('Error deleting account from DB:', err));
+    }
   };
 
   const handleCreateAccount = (e: React.FormEvent) => {
     e.preventDefault();
+    if (userRole === 'alumno') return;
     if (!name.trim() || !username.trim()) return;
 
     const newAcc: Account = {
@@ -148,7 +175,7 @@ export const AccountsSection: React.FC<AccountsSectionProps> = ({ userRole = 'ad
     };
 
     const updated = [newAcc, ...accounts];
-    saveAccounts(updated);
+    saveAccounts(updated, newAcc);
 
     // Reset Form
     setName('');
@@ -160,9 +187,10 @@ export const AccountsSection: React.FC<AccountsSectionProps> = ({ userRole = 'ad
   };
 
   const handleDelete = (id: string) => {
+    if (userRole === 'alumno') return;
     if (confirm('¿Estás seguro de que querés eliminar esta cuenta?')) {
       const updated = accounts.filter(a => a.id !== id);
-      saveAccounts(updated);
+      saveAccounts(updated, undefined, id);
     }
   };
 

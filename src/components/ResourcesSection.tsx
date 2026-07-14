@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { BookOpen, Search, Plus, Trash2, ExternalLink, Copy, Check, FileText, Video, Link, Image, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { BookOpen, Search, Plus, Trash2, ExternalLink, Copy, Check, FileText, Video, Link, Image, Sparkles, ShieldCheck } from 'lucide-react';
 
 interface Resource {
   id: string;
@@ -10,7 +10,25 @@ interface Resource {
   description?: string;
 }
 
-export const ResourcesSection: React.FC = () => {
+interface ResourcesSectionProps {
+  userRole?: string;
+}
+
+export const ResourcesSection: React.FC<ResourcesSectionProps> = ({ userRole }) => {
+  if (userRole === 'alumno') {
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-6 rounded-2xl flex items-start gap-4 max-w-xl mx-auto my-12 shadow-xs animate-fade-in">
+        <ShieldCheck className="w-8 h-8 text-red-600 shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <h4 className="font-sans font-black uppercase tracking-wider text-red-800 text-sm">Acceso Denegado 🔐</h4>
+          <p className="font-sans text-red-600 leading-relaxed font-semibold">
+            No tenés permisos para visualizar la sección de Recursos Pedagógicos del Staff. Esta sección está reservada exclusivamente para profesores y coordinadores de Pixelitos.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const [resources, setResources] = useState<Resource[]>(() => {
     const saved = localStorage.getItem('pixelitos_resources');
     if (saved) {
@@ -71,9 +89,35 @@ export const ResourcesSection: React.FC = () => {
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const saveResources = (newResources: Resource[]) => {
+  // Fetch resources from Neon DB on mount
+  useEffect(() => {
+    fetch('/api/resources')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setResources(data);
+        }
+      })
+      .catch((err) => console.error('Error fetching resources from DB:', err));
+  }, []);
+
+  const saveResources = (newResources: Resource[], resourceToUpsert?: Resource, resourceIdToDelete?: string) => {
     setResources(newResources);
     localStorage.setItem('pixelitos_resources', JSON.stringify(newResources));
+
+    if (resourceToUpsert) {
+      fetch('/api/resources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(resourceToUpsert),
+      }).catch((err) => console.error('Error saving resource to DB:', err));
+    }
+
+    if (resourceIdToDelete) {
+      fetch(`/api/resources/${resourceIdToDelete}`, {
+        method: 'DELETE',
+      }).catch((err) => console.error('Error deleting resource from DB:', err));
+    }
   };
 
   const handleCreate = (e: React.FormEvent) => {
@@ -90,7 +134,7 @@ export const ResourcesSection: React.FC = () => {
     };
 
     const updated = [newRes, ...resources];
-    saveResources(updated);
+    saveResources(updated, newRes);
 
     // Reset Form
     setTitle('');
@@ -102,7 +146,7 @@ export const ResourcesSection: React.FC = () => {
   const handleDelete = (id: string) => {
     if (confirm('¿Estás seguro de que querés eliminar este recurso pedagógico?')) {
       const updated = resources.filter(r => r.id !== id);
-      saveResources(updated);
+      saveResources(updated, undefined, id);
     }
   };
 

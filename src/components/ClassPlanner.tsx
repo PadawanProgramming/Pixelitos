@@ -78,13 +78,40 @@ export const ClassPlanner: React.FC<ClassPlannerProps> = ({ materials, userRole 
   const [showForm, setShowForm] = useState(false);
   const [editingPlan, setEditingPlan] = useState<ClassPlan | null>(null);
 
-  const savePlans = (newPlans: ClassPlan[]) => {
+  // Fetch class plans from Neon DB on mount
+  React.useEffect(() => {
+    fetch('/api/class-plans')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setPlans(data);
+        }
+      })
+      .catch((err) => console.error('Error fetching plans from DB:', err));
+  }, []);
+
+  const savePlans = (newPlans: ClassPlan[], planToUpsert?: ClassPlan, planIdToDelete?: string) => {
     setPlans(newPlans);
     localStorage.setItem('pixelitos_class_plans', JSON.stringify(newPlans));
+
+    if (planToUpsert) {
+      fetch('/api/class-plans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(planToUpsert),
+      }).catch((err) => console.error('Error saving plan to DB:', err));
+    }
+
+    if (planIdToDelete) {
+      fetch(`/api/class-plans/${planIdToDelete}`, {
+        method: 'DELETE',
+      }).catch((err) => console.error('Error deleting plan from DB:', err));
+    }
   };
 
   const toggleClassRealized = (planId: string, classId: string) => {
     if (userRole === 'alumno') return;
+    let targetPlan: ClassPlan | undefined;
     const updated = plans.map((p) => {
       if (p.id === planId) {
         const currentRealized = p.realizedClassIds || [];
@@ -92,14 +119,16 @@ export const ClassPlanner: React.FC<ClassPlannerProps> = ({ materials, userRole 
         const newRealized = isAlreadyRealized
           ? currentRealized.filter((id) => id !== classId)
           : [...currentRealized, classId];
-        return { ...p, realizedClassIds: newRealized };
+        targetPlan = { ...p, realizedClassIds: newRealized };
+        return targetPlan;
       }
       return p;
     });
-    savePlans(updated);
+    savePlans(updated, targetPlan);
   };
 
   const handleStartEditPlan = (plan: ClassPlan) => {
+    if (userRole === 'alumno') return;
     setEditingPlan(plan);
     setMonth(plan.month);
     setTargetGroup(plan.targetGroup);
@@ -128,29 +157,27 @@ export const ClassPlanner: React.FC<ClassPlannerProps> = ({ materials, userRole 
 
   const handleAddPlan = (e: React.FormEvent) => {
     e.preventDefault();
+    if (userRole === 'alumno') return;
     if (!month.trim()) return;
 
     // Filter out any unselected classes to keep database clean
     const activeClassIds = classIds.filter(id => id !== '');
 
     let updated: ClassPlan[];
+    let targetPlan: ClassPlan;
     if (editingPlan) {
-      updated = plans.map((p) => {
-        if (p.id === editingPlan.id) {
-          return {
-            ...p,
-            month: month.trim(),
-            targetGroup,
-            objectives: objectives.trim(),
-            level: planLevel,
-            classIds: activeClassIds,
-          };
-        }
-        return p;
-      });
+      targetPlan = {
+        ...editingPlan,
+        month: month.trim(),
+        targetGroup,
+        objectives: objectives.trim(),
+        level: planLevel,
+        classIds: activeClassIds,
+      };
+      updated = plans.map((p) => (p.id === editingPlan.id ? targetPlan : p));
       setEditingPlan(null);
     } else {
-      const newPlan: ClassPlan = {
+      targetPlan = {
         id: `plan-${Date.now()}`,
         month: month.trim(),
         targetGroup,
@@ -159,10 +186,10 @@ export const ClassPlanner: React.FC<ClassPlannerProps> = ({ materials, userRole 
         classIds: activeClassIds,
         realizedClassIds: [],
       };
-      updated = [newPlan, ...plans];
+      updated = [targetPlan, ...plans];
     }
 
-    savePlans(updated);
+    savePlans(updated, targetPlan);
 
     // Reset form
     setMonth('');
@@ -174,8 +201,9 @@ export const ClassPlanner: React.FC<ClassPlannerProps> = ({ materials, userRole 
   };
 
   const handleDeletePlan = (id: string) => {
+    if (userRole === 'alumno') return;
     const updated = plans.filter((p) => p.id !== id);
-    savePlans(updated);
+    savePlans(updated, undefined, id);
   };
 
   const handleClassChange = (index: number, val: string) => {

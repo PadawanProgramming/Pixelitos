@@ -36,6 +36,7 @@ import { LandingPage } from './components/LandingPage';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { SharedProjectView } from './components/SharedProjectView';
 import { exportProjectsToPDF } from './utils/pdfExport';
+import { verifySession } from './utils/security';
 
 const TUTORIAL_STEPS = [
   {
@@ -94,7 +95,13 @@ export default function App() {
     const saved = localStorage.getItem('pixelitos_session');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (verifySession(parsed)) {
+          return parsed;
+        } else {
+          console.warn('Tampered or invalid session signature detected. Clearing session.');
+          localStorage.removeItem('pixelitos_session');
+        }
       } catch (e) {
         console.error('Error loading session:', e);
       }
@@ -163,7 +170,18 @@ export default function App() {
     return !!localStorage.getItem('pixelitos_materials_recovery_backup');
   });
 
-  // Sync to local storage
+  // Sync to local storage & fetch from database on mount
+  useEffect(() => {
+    fetch('/api/materials')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setMaterials(data);
+        }
+      })
+      .catch((err) => console.error('Error fetching materials from DB:', err));
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('pixelitos_materials', JSON.stringify(materials));
   }, [materials]);
@@ -274,6 +292,12 @@ export default function App() {
     } else {
       setMaterials([savedMaterial, ...materials]);
     }
+
+    fetch('/api/materials', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(savedMaterial),
+    }).catch((err) => console.error('Error saving material to DB:', err));
   };
 
   // Delete Material handler
@@ -288,14 +312,28 @@ export default function App() {
     }
     if (shouldDelete) {
       setMaterials(materials.filter((m) => m.id !== id));
+
+      fetch(`/api/materials/${id}`, {
+        method: 'DELETE',
+      }).catch((err) => console.error('Error deleting material from DB:', err));
     }
   };
 
   // Toggle Favorite
   const handleToggleFavorite = (id: string) => {
-    setMaterials(
-      materials.map((m) => (m.id === id ? { ...m, isFavorite: !m.isFavorite } : m))
-    );
+    const updated = materials.map((m) => {
+      if (m.id === id) {
+        const toggled = { ...m, isFavorite: !m.isFavorite };
+        fetch('/api/materials', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(toggled),
+        }).catch((err) => console.error('Error syncing favorite to DB:', err));
+        return toggled;
+      }
+      return m;
+    });
+    setMaterials(updated);
   };
 
   // Trigger Edit Modal
@@ -1242,12 +1280,12 @@ export default function App() {
 
         {/* TAB 4: RESOURCES SECTION */}
         {activeTab === 'resources' && (
-          <ResourcesSection />
+          <ResourcesSection userRole={session.role} />
         )}
 
         {/* TAB 5: TEACHER BULLETIN */}
         {activeTab === 'bulletin' && (
-          <TeacherBulletin />
+          <TeacherBulletin userRole={session.role} />
         )}
 
         {/* TAB 6: STUDENTS / TEACHER DASHBOARD */}

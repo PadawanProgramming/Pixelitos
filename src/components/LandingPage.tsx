@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, ArrowRight, AlertCircle, Key, Lock, Sparkles, BookOpen, ShieldCheck, Laptop, HelpCircle } from 'lucide-react';
-import { LevelType, UserRole, UserSession, StudentProfile } from '../types';
+import { LevelType, UserRole, UserSession, StudentProfile, TeacherProfile } from '../types';
+import { signSession } from '../utils/security';
 
 interface LandingPageProps {
   onLogin: (session: UserSession) => void;
@@ -48,8 +49,28 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
   const [adminPass, setAdminPass] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [showHelper, setShowHelper] = useState(true);
+  
+  const [dbStudents, setDbStudents] = useState<StudentProfile[]>([]);
+  const [dbTeachers, setDbTeachers] = useState<TeacherProfile[]>([]);
 
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Pre-fetch live accounts from database on load
+  useEffect(() => {
+    fetch('/api/students')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) setDbStudents(data);
+      })
+      .catch((err) => console.error('Error pre-fetching students for login:', err));
+
+    fetch('/api/teachers')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) setDbTeachers(data);
+      })
+      .catch((err) => console.error('Error pre-fetching teachers for login:', err));
+  }, []);
 
   // Auto-focus the input when a role is selected
   useEffect(() => {
@@ -73,6 +94,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
     return DEFAULT_STUDENTS;
   };
 
+  const getTeachersList = (): TeacherProfile[] => {
+    const saved = localStorage.getItem('pixelitos_teachers');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return [
+      { id: 't-1', name: 'Profesor Principal', password: 'profe', notes: 'Profesor titular del taller de robótica.' },
+      { id: 't-2', name: 'Profe Auxiliar', password: 'profe2026', notes: 'Asistente de Scratch y Pilas Bloques.' }
+    ];
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -84,7 +120,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
         return;
       }
 
-      const allStudents = getStudentsList();
+      const allStudents = dbStudents.length > 0 ? dbStudents : getStudentsList();
       // Match passcode case-insensitively for student convenience
       const profile = allStudents.find(
         (s) => s.password?.trim().toLowerCase() === enteredPass.toLowerCase()
@@ -95,22 +131,32 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
         return;
       }
 
-      onLogin({
+      onLogin(signSession({
         role: 'alumno',
         studentLevel: profile.level,
         studentName: profile.name
-      });
+      }));
     } else if (loginRole === 'profesor') {
       const enteredPass = teacherPass.trim().toLowerCase();
-      if (enteredPass === 'profe2026' || enteredPass === 'profe') {
-        onLogin({ role: 'profesor' });
+      if (!enteredPass) {
+        setErrorMsg('Por favor ingresá tu contraseña.');
+        return;
+      }
+
+      const allTeachers = dbTeachers.length > 0 ? dbTeachers : getTeachersList();
+      const match = allTeachers.find(
+        (t) => t.password?.trim().toLowerCase() === enteredPass
+      );
+
+      if (match || enteredPass === 'profe2026' || enteredPass === 'profe') {
+        onLogin(signSession({ role: 'profesor' }));
       } else {
-        setErrorMsg('Contraseña de profesor incorrecta. Probá con "profe2026".');
+        setErrorMsg('Contraseña de profesor incorrecta.');
       }
     } else if (loginRole === 'admin') {
       const enteredPass = adminPass.trim().toLowerCase();
       if (enteredPass === 'admin2026' || enteredPass === 'admin') {
-        onLogin({ role: 'admin' });
+        onLogin(signSession({ role: 'admin' }));
       } else {
         setErrorMsg('Contraseña de administrador incorrecta. Probá con "admin2026".');
       }
