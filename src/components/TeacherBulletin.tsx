@@ -79,16 +79,19 @@ export const TeacherBulletin: React.FC<TeacherBulletinProps> = ({ userRole }) =>
     fetch('/api/bulletins')
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setMessages(data);
         }
       })
       .catch((err) => console.error('Error fetching bulletins from DB:', err));
   }, []);
 
+  useEffect(() => {
+    localStorage.setItem('pixelitos_bulletins', JSON.stringify(messages));
+  }, [messages]);
+
   const saveMessages = (newMsgs: BulletinMessage[], msgToUpsert?: BulletinMessage, msgIdToDelete?: string) => {
     setMessages(newMsgs);
-    localStorage.setItem('pixelitos_bulletins', JSON.stringify(newMsgs));
 
     if (msgToUpsert) {
       fetch('/api/bulletins', {

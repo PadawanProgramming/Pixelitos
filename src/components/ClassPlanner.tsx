@@ -83,16 +83,19 @@ export const ClassPlanner: React.FC<ClassPlannerProps> = ({ materials, userRole 
     fetch('/api/class-plans')
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setPlans(data);
         }
       })
       .catch((err) => console.error('Error fetching plans from DB:', err));
   }, []);
 
+  React.useEffect(() => {
+    localStorage.setItem('pixelitos_class_plans', JSON.stringify(plans));
+  }, [plans]);
+
   const savePlans = (newPlans: ClassPlan[], planToUpsert?: ClassPlan, planIdToDelete?: string) => {
     setPlans(newPlans);
-    localStorage.setItem('pixelitos_class_plans', JSON.stringify(newPlans));
 
     if (planToUpsert) {
       fetch('/api/class-plans', {

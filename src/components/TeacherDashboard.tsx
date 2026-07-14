@@ -119,7 +119,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onStudentsCh
     fetch('/api/students')
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setStudents(data);
         }
       })
@@ -128,16 +128,24 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onStudentsCh
     fetch('/api/teachers')
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setTeachers(data);
         }
       })
       .catch((err) => console.error('Error fetching teachers from DB:', err));
   }, []);
 
+  useEffect(() => {
+    localStorage.setItem('pixelitos_students', JSON.stringify(students));
+    if (onStudentsChanged) onStudentsChanged();
+  }, [students]);
+
+  useEffect(() => {
+    localStorage.setItem('pixelitos_teachers', JSON.stringify(teachers));
+  }, [teachers]);
+
   const saveTeachers = (updatedList: TeacherProfile[], teacherToUpsert?: TeacherProfile, teacherIdToDelete?: string) => {
     setTeachers(updatedList);
-    localStorage.setItem('pixelitos_teachers', JSON.stringify(updatedList));
 
     if (teacherToUpsert) {
       fetch('/api/teachers', {
@@ -156,8 +164,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onStudentsCh
 
   const saveStudents = (updatedList: StudentProfile[], studentToUpsert?: StudentProfile, studentIdToDelete?: string) => {
     setStudents(updatedList);
-    localStorage.setItem('pixelitos_students', JSON.stringify(updatedList));
-    if (onStudentsChanged) onStudentsChanged();
 
     if (studentToUpsert) {
       fetch('/api/students', {

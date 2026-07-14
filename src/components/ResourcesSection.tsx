@@ -94,16 +94,19 @@ export const ResourcesSection: React.FC<ResourcesSectionProps> = ({ userRole }) 
     fetch('/api/resources')
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setResources(data);
         }
       })
       .catch((err) => console.error('Error fetching resources from DB:', err));
   }, []);
 
+  useEffect(() => {
+    localStorage.setItem('pixelitos_resources', JSON.stringify(resources));
+  }, [resources]);
+
   const saveResources = (newResources: Resource[], resourceToUpsert?: Resource, resourceIdToDelete?: string) => {
     setResources(newResources);
-    localStorage.setItem('pixelitos_resources', JSON.stringify(newResources));
 
     if (resourceToUpsert) {
       fetch('/api/resources', {

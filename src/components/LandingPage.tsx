@@ -176,7 +176,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
     setErrorMsg('');
   };
 
-  const allStudents = getStudentsList();
+  const allStudents = dbStudents.length > 0 ? dbStudents : getStudentsList();
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-between" id="pixelitos-landing">

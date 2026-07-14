@@ -132,16 +132,19 @@ export const AccountsSection: React.FC<AccountsSectionProps> = ({ userRole = 'ad
     fetch('/api/accounts')
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setAccounts(data);
         }
       })
       .catch((err) => console.error('Error fetching accounts from DB:', err));
   }, []);
 
+  React.useEffect(() => {
+    localStorage.setItem('pixelitos_accounts', JSON.stringify(accounts));
+  }, [accounts]);
+
   const saveAccounts = (newAccounts: Account[], accountToUpsert?: Account, accountIdToDelete?: string) => {
     setAccounts(newAccounts);
-    localStorage.setItem('pixelitos_accounts', JSON.stringify(newAccounts));
 
     if (accountToUpsert) {
       fetch('/api/accounts', {
