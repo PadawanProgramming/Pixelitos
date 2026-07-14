@@ -18,6 +18,31 @@ export type LevelType = '1°1°' | '1°2°' | '2°1°' | '2°2°';
 export type AgeRangeType = '7-9 años' | '10-12 años';
 export type DifficultyType = 'bajo' | 'intermedio' | 'alto';
 
+export type UserRole = 'public' | 'alumno' | 'profesor' | 'admin';
+
+export interface UserSession {
+  role: UserRole;
+  studentLevel?: LevelType;
+  studentName?: string;
+}
+
+export interface StudentProfile {
+  id: string;
+  name: string;
+  level: LevelType;
+  username: string; // generated automatic key
+  password?: string;
+  notes?: string;
+}
+
+export interface TeacherProfile {
+  id: string;
+  name: string;
+  password?: string;
+  notes?: string;
+}
+
+
 export interface EducationalMaterial {
   id: string;
   title: string;

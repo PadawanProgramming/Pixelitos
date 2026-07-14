@@ -22,8 +22,9 @@ import {
   X,
   Undo,
   HelpCircle,
+  LogOut,
 } from 'lucide-react';
-import { EducationalMaterial, ToolType, AgeGroupType, LevelType, AgeRangeType, DifficultyType, enrichMaterial } from './types';
+import { EducationalMaterial, ToolType, AgeGroupType, LevelType, AgeRangeType, DifficultyType, enrichMaterial, UserRole, UserSession, StudentProfile } from './types';
 import { INITIAL_MATERIALS } from './data/initialMaterials';
 import { MaterialCard } from './components/MaterialCard';
 import { ClassPlanner } from './components/ClassPlanner';
@@ -31,6 +32,9 @@ import { TeacherBulletin } from './components/TeacherBulletin';
 import { AccountsSection } from './components/AccountsSection';
 import { ResourcesSection } from './components/ResourcesSection';
 import { MaterialModal } from './components/MaterialModal';
+import { LandingPage } from './components/LandingPage';
+import { TeacherDashboard } from './components/TeacherDashboard';
+import { SharedProjectView } from './components/SharedProjectView';
 import { exportProjectsToPDF } from './utils/pdfExport';
 
 const TUTORIAL_STEPS = [
@@ -79,6 +83,25 @@ const TUTORIAL_STEPS = [
 ];
 
 export default function App() {
+  // Check for share query parameter
+  const [sharedMaterialId, setSharedMaterialId] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('share');
+  });
+
+  // User Session state
+  const [session, setSession] = useState<UserSession | null>(() => {
+    const saved = localStorage.getItem('pixelitos_session');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Error loading session:', e);
+      }
+    }
+    return null;
+  });
+
   // State for educational materials
   const [materials, setMaterials] = useState<EducationalMaterial[]>(() => {
     const saved = localStorage.getItem('pixelitos_materials');
@@ -127,7 +150,7 @@ export default function App() {
   }, [searchQuery, selectedTool, selectedLevel, selectedAgeRange, selectedDifficulty, sortBy]);
 
   // UI States
-  const [activeTab, setActiveTab] = useState<'repository' | 'planner' | 'accounts' | 'resources' | 'bulletin'>('repository');
+  const [activeTab, setActiveTab] = useState<'repository' | 'planner' | 'accounts' | 'resources' | 'bulletin' | 'students'>('repository');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -135,6 +158,7 @@ export default function App() {
   const [scratchUserCopied, setScratchUserCopied] = useState(false);
   const [scratchPasswordCopied, setScratchPasswordCopied] = useState(false);
   const [showResetNotice, setShowResetNotice] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [hasRecoveryBackup, setHasRecoveryBackup] = useState(() => {
     return !!localStorage.getItem('pixelitos_materials_recovery_backup');
   });
@@ -160,7 +184,14 @@ export default function App() {
 
   // Reset to original data with automatic recovery copy
   const handleResetToDefaults = () => {
-    if (window.confirm('⚠️ ¡CUIDADO! ¿Estás seguro de que deseas restablecer la base de datos completa de Pixelitos? Se perderán todas tus modificaciones personales (proyectos y planes) y la base de datos volverá a su estado original.\n\n(No te preocupes: guardaremos automáticamente una copia de seguridad temporal de tus datos actuales por si necesitas deshacer este cambio).')) {
+    let shouldReset = false;
+    try {
+      shouldReset = window.confirm('⚠️ ¡CUIDADO! ¿Estás seguro de que deseas restablecer la base de datos completa de Pixelitos? Se perderán todas tus modificaciones personales (proyectos y planes) y la base de datos volverá a su estado original.\n\n(No te preocupes: guardaremos automáticamente una copia de seguridad temporal de tus datos actuales por si necesitas deshacer este cambio).');
+    } catch (e) {
+      shouldReset = true; // Fallback if browser blocks confirm inside sandbox
+    }
+
+    if (shouldReset) {
       // Create emergency copies first
       localStorage.setItem('pixelitos_materials_recovery_backup', JSON.stringify(materials));
       const savedPlans = localStorage.getItem('pixelitos_class_plans');
@@ -249,7 +280,13 @@ export default function App() {
   const handleDeleteMaterial = (id: string) => {
     const target = materials.find((m) => m.id === id);
     if (!target) return;
-    if (window.confirm(`¿Estás seguro de que deseas eliminar "${target.title}"?`)) {
+    let shouldDelete = false;
+    try {
+      shouldDelete = window.confirm(`¿Estás seguro de que deseas eliminar "${target.title}"?`);
+    } catch (e) {
+      shouldDelete = true; // Fallback if browser blocks confirm inside sandbox
+    }
+    if (shouldDelete) {
       setMaterials(materials.filter((m) => m.id !== id));
     }
   };
@@ -320,7 +357,9 @@ export default function App() {
     }
 
     // Level filter
-    if (selectedLevel !== 'Todos') {
+    if (session?.role === 'alumno') {
+      result = result.filter((m) => m.level === session.studentLevel);
+    } else if (selectedLevel !== 'Todos') {
       result = result.filter((m) => m.level === selectedLevel);
     }
 
@@ -357,6 +396,36 @@ export default function App() {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     return filteredAndSortedMaterials.slice(startIndex, startIndex + ITEMS_PER_PAGE);
   }, [filteredAndSortedMaterials, currentPage]);
+
+  if (sharedMaterialId) {
+    return (
+      <SharedProjectView
+        materialId={sharedMaterialId}
+        materials={materials}
+        userRole={session?.role}
+        onBackToPortal={() => {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('share');
+          window.history.pushState({}, '', url.toString());
+          setSharedMaterialId(null);
+        }}
+      />
+    );
+  }
+
+  if (!session) {
+    return (
+      <LandingPage
+        onLogin={(s) => {
+          setSession(s);
+          localStorage.setItem('pixelitos_session', JSON.stringify(s));
+          if (s.role === 'alumno') {
+            setActiveTab('repository');
+          }
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col lg:flex-row" id="pixelitos-root">
@@ -552,143 +621,208 @@ export default function App() {
             </span>
           </button>
 
-          <button
-            onClick={() => {
-              setActiveTab('resources');
-              setIsSidebarOpen(false);
-            }}
-            className={`w-full relative flex items-center justify-between text-xs font-bold px-3.5 py-3 rounded-lg transition-all cursor-pointer border-l-4 ${
-              activeTab === 'resources'
-                ? 'bg-[#f0da4c] text-slate-950 font-black shadow-md border-amber-500'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900/50 border-transparent hover:border-slate-800'
-            } ${
-              isTutorialOpen && tutorialStep === 4
-                ? 'ring-4 ring-amber-400 ring-offset-2 ring-offset-slate-950 scale-[1.03] shadow-lg shadow-amber-400/30 z-50 bg-slate-900 text-white'
-                : ''
-            }`}
-          >
-            <span className="flex items-center gap-3">
-              <BookOpen className="w-4 h-4 shrink-0" />
-              <span>Recursos</span>
-              {isTutorialOpen && tutorialStep === 4 && (
-                <span className="text-[9px] font-black tracking-wider text-slate-950 bg-[#f0da4c] px-1.5 py-0.5 rounded animate-pulse">
-                  👈 AQUÍ
+          {/* Teacher and Admin Tabs */}
+          {session.role !== 'alumno' && (
+            <>
+              <button
+                onClick={() => {
+                  setActiveTab('resources');
+                  setIsSidebarOpen(false);
+                }}
+                className={`w-full relative flex items-center justify-between text-xs font-bold px-3.5 py-3 rounded-lg transition-all cursor-pointer border-l-4 ${
+                  activeTab === 'resources'
+                    ? 'bg-[#f0da4c] text-slate-950 font-black shadow-md border-amber-500'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900/50 border-transparent hover:border-slate-800'
+                } ${
+                  isTutorialOpen && tutorialStep === 4
+                    ? 'ring-4 ring-amber-400 ring-offset-2 ring-offset-slate-950 scale-[1.03] shadow-lg shadow-amber-400/30 z-50 bg-slate-900 text-white'
+                    : ''
+                }`}
+              >
+                <span className="flex items-center gap-3">
+                  <BookOpen className="w-4 h-4 shrink-0" />
+                  <span>Recursos</span>
+                  {isTutorialOpen && tutorialStep === 4 && (
+                    <span className="text-[9px] font-black tracking-wider text-slate-950 bg-[#f0da4c] px-1.5 py-0.5 rounded animate-pulse">
+                      👈 AQUÍ
+                    </span>
+                  )}
                 </span>
-              )}
-            </span>
-          </button>
+              </button>
 
-          <button
-            onClick={() => {
-              setActiveTab('bulletin');
-              setIsSidebarOpen(false);
-            }}
-            className={`w-full relative flex items-center justify-between text-xs font-bold px-3.5 py-3 rounded-lg transition-all cursor-pointer border-l-4 ${
-              activeTab === 'bulletin'
-                ? 'bg-[#f0da4c] text-slate-950 font-black shadow-md border-amber-500'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900/50 border-transparent hover:border-slate-800'
-            } ${
-              isTutorialOpen && tutorialStep === 5
-                ? 'ring-4 ring-amber-400 ring-offset-2 ring-offset-slate-950 scale-[1.03] shadow-lg shadow-amber-400/30 z-50 bg-slate-900 text-white'
-                : ''
-            }`}
-          >
-            <span className="flex items-center gap-3">
-              <MessageSquare className="w-4 h-4 shrink-0" />
-              <span>Pizarra</span>
-              {isTutorialOpen && tutorialStep === 5 && (
-                <span className="text-[9px] font-black tracking-wider text-slate-950 bg-[#f0da4c] px-1.5 py-0.5 rounded animate-pulse">
-                  👈 AQUÍ
+              <button
+                onClick={() => {
+                  setActiveTab('bulletin');
+                  setIsSidebarOpen(false);
+                }}
+                className={`w-full relative flex items-center justify-between text-xs font-bold px-3.5 py-3 rounded-lg transition-all cursor-pointer border-l-4 ${
+                  activeTab === 'bulletin'
+                    ? 'bg-[#f0da4c] text-slate-950 font-black shadow-md border-amber-500'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900/50 border-transparent hover:border-slate-800'
+                } ${
+                  isTutorialOpen && tutorialStep === 5
+                    ? 'ring-4 ring-amber-400 ring-offset-2 ring-offset-slate-950 scale-[1.03] shadow-lg shadow-amber-400/30 z-50 bg-slate-900 text-white'
+                    : ''
+                }`}
+              >
+                <span className="flex items-center gap-3">
+                  <MessageSquare className="w-4 h-4 shrink-0" />
+                  <span>Pizarra</span>
+                  {isTutorialOpen && tutorialStep === 5 && (
+                    <span className="text-[9px] font-black tracking-wider text-slate-950 bg-[#f0da4c] px-1.5 py-0.5 rounded animate-pulse">
+                      👈 AQUÍ
+                    </span>
+                  )}
                 </span>
-              )}
-            </span>
-          </button>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab('students');
+                  setIsSidebarOpen(false);
+                }}
+                className={`w-full relative flex items-center justify-between text-xs font-bold px-3.5 py-3 rounded-lg transition-all cursor-pointer border-l-4 ${
+                  activeTab === 'students'
+                    ? 'bg-[#f0da4c] text-slate-950 font-black shadow-md border-amber-500'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900/50 border-transparent hover:border-slate-800'
+                }`}
+              >
+                <span className="flex items-center gap-3">
+                  <Users className="w-4 h-4 shrink-0" />
+                  <span>Alumnos / Dashboard 👥</span>
+                </span>
+              </button>
+            </>
+          )}
 
           {/* Divider and Help Section */}
-          <div className="pt-2 pb-1 border-t border-slate-900 my-1 mx-2">
-            <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest px-1.5">Guía de Ayuda</div>
-          </div>
+          {session.role !== 'alumno' && (
+            <>
+              <div className="pt-2 pb-1 border-t border-slate-900 my-1 mx-2">
+                <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest px-1.5">Guía de Ayuda</div>
+              </div>
 
-          <button
-            onClick={() => {
-              setTutorialStep(0);
-              setIsTutorialOpen(true);
-              setIsSidebarOpen(false);
-            }}
-            className={`w-full relative flex items-center justify-between text-xs font-bold px-3.5 py-2.5 rounded-lg transition-all cursor-pointer border border-amber-500/20 bg-amber-500/5 text-amber-400 hover:text-white hover:bg-amber-500/10 hover:border-amber-500/40 ${
-              isTutorialOpen
-                ? 'ring-2 ring-amber-400 scale-[0.98]'
-                : ''
-            }`}
-          >
-            <span className="flex items-center gap-3">
-              <HelpCircle className="w-4 h-4 shrink-0 text-amber-400 animate-pulse" />
-              <span>Tutorial de la App</span>
-            </span>
-            <span className="bg-[#f0da4c] text-slate-950 text-[8px] font-black tracking-normal px-1.5 py-0.5 rounded">
-              GUÍA
-            </span>
-          </button>
+              <button
+                onClick={() => {
+                  setTutorialStep(0);
+                  setIsTutorialOpen(true);
+                  setIsSidebarOpen(false);
+                }}
+                className={`w-full relative flex items-center justify-between text-xs font-bold px-3.5 py-2.5 rounded-lg transition-all cursor-pointer border border-amber-500/20 bg-amber-500/5 text-amber-400 hover:text-white hover:bg-amber-500/10 hover:border-amber-500/40 ${
+                  isTutorialOpen
+                    ? 'ring-2 ring-amber-400 scale-[0.98]'
+                    : ''
+                }`}
+              >
+                <span className="flex items-center gap-3">
+                  <HelpCircle className="w-4 h-4 shrink-0 text-amber-400 animate-pulse" />
+                  <span>Tutorial de la App</span>
+                </span>
+                <span className="bg-[#f0da4c] text-slate-950 text-[8px] font-black tracking-normal px-1.5 py-0.5 rounded">
+                  GUÍA
+                </span>
+              </button>
+            </>
+          )}
         </nav>
 
-        {/* Sidebar Footer with backups */}
-        <div className={`p-4 border-t border-slate-800/80 bg-slate-950/60 space-y-3 shrink-0 transition-all duration-300 ${
-          isTutorialOpen && tutorialStep === 6
-            ? 'ring-4 ring-amber-400 ring-offset-2 ring-offset-slate-950 scale-[1.01] shadow-lg shadow-amber-400/30 rounded-xl bg-slate-900/90 z-50'
-            : ''
-        }`}>
-          <div className="flex items-center justify-between gap-1">
-            <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest px-1">COORDINACIÓN / RESPALDOS</div>
-            {isTutorialOpen && tutorialStep === 6 && (
-              <span className="text-[9px] font-black tracking-wider text-slate-950 bg-[#f0da4c] px-1.5 py-0.5 rounded animate-pulse">
-                👈 RESPALDOS
-              </span>
-            )}
-          </div>
+        {/* Sidebar Footer */}
+        <div className="p-4 border-t border-slate-800/80 bg-slate-950/60 space-y-3 shrink-0">
           
-          <div className="grid grid-cols-1 gap-2">
-            <label className="flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wider bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800/80 py-2 rounded-lg cursor-pointer transition-all active:scale-95">
-              <FileUp className="w-3.5 h-3.5 text-amber-400" />
-              <span>Cargar Backup</span>
-              <input
-                type="file"
-                accept=".json"
-                onChange={handleImportBackup}
-                className="hidden"
-              />
-            </label>
-
-            <button
-              onClick={handleExportBackup}
-              className="flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wider bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800/80 py-2 rounded-lg transition-all active:scale-95 cursor-pointer"
-              title="Descargar copia en JSON"
-            >
-              <FileDown className="w-3.5 h-3.5 text-slate-400" />
-              <span>Guardar Backup</span>
-            </button>
-
-            <button
-              onClick={handleResetToDefaults}
-              className="flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wider bg-red-950/30 hover:bg-red-950/50 text-red-400 border border-red-900/40 py-2 rounded-lg transition-all active:scale-95 cursor-pointer"
-              title="Restablecer base de datos"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Restablecer</span>
-            </button>
-
-            {hasRecoveryBackup && (
-              <button
-                onClick={handleRestoreEmergencyBackup}
-                className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-wider bg-amber-950/40 hover:bg-amber-900/55 text-amber-400 border border-amber-900/40 py-2 rounded-lg transition-all active:scale-95 cursor-pointer animate-pulse"
-                title="Restaurar base de datos a la versión anterior al reset"
-              >
-                <Undo className="w-3.5 h-3.5" />
-                <span>Deshacer Reset</span>
-              </button>
+          {/* Active Session Info */}
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 space-y-2">
+            <div className="flex items-center justify-between text-[10px]">
+              <span className="font-bold text-slate-400 uppercase tracking-wider">Sesión Activa</span>
+              <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                session.role === 'admin' ? 'bg-indigo-600 text-white' :
+                session.role === 'profesor' ? 'bg-amber-500 text-slate-950' :
+                'bg-emerald-600 text-white'
+              }`}>
+                {session.role}
+              </span>
+            </div>
+            <p className="font-sans text-xs font-bold text-slate-200">
+              {session.role === 'alumno' ? `🎒 ${session.studentName}` : `🍎 Staff Pixelitos`}
+            </p>
+            {session.role === 'alumno' && (
+              <p className="font-sans text-[10px] text-slate-400 font-semibold">
+                Nivel Asignado: {session.studentLevel}
+              </p>
             )}
+            
+            <button
+              onClick={() => {
+                setSession(null);
+                localStorage.removeItem('pixelitos_session');
+              }}
+              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-950/25 hover:bg-red-950/50 border border-red-900/40 text-red-400 hover:text-red-300 font-bold text-2xs uppercase tracking-wider transition-all cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Cerrar Sesión</span>
+            </button>
           </div>
 
-          <div className="pt-2 text-center text-[9px] text-slate-500 font-medium">
+          {/* Backup & Administration (Only for ADMIN role) */}
+          {session.role === 'admin' && (
+            <div className={`space-y-3 pt-2 border-t border-slate-800 ${
+              isTutorialOpen && tutorialStep === 6
+                ? 'ring-4 ring-amber-400 ring-offset-2 ring-offset-slate-950 scale-[1.01] shadow-lg shadow-amber-400/30 rounded-xl bg-slate-900/90 z-50 p-2'
+                : ''
+            }`}>
+              <div className="flex items-center justify-between gap-1">
+                <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest px-1">COORDINACIÓN / RESPALDOS</div>
+                {isTutorialOpen && tutorialStep === 6 && (
+                  <span className="text-[9px] font-black tracking-wider text-slate-950 bg-[#f0da4c] px-1.5 py-0.5 rounded animate-pulse">
+                    👈 RESPALDOS
+                  </span>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-1 gap-2">
+                <label className="flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wider bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800/80 py-2 rounded-lg cursor-pointer transition-all active:scale-95">
+                  <FileUp className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Cargar Backup</span>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleImportBackup}
+                    className="hidden"
+                  />
+                </label>
+
+                <button
+                  onClick={handleExportBackup}
+                  className="flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wider bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800/80 py-2 rounded-lg transition-all active:scale-95 cursor-pointer"
+                  title="Descargar copia en JSON"
+                >
+                  <FileDown className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Guardar Backup</span>
+                </button>
+
+                <button
+                  onClick={handleResetToDefaults}
+                  className="flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wider bg-red-950/30 hover:bg-red-950/50 text-red-400 border border-red-900/40 py-2 rounded-lg transition-all active:scale-95 cursor-pointer"
+                  title="Restablecer base de datos"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Restablecer</span>
+                </button>
+
+                {hasRecoveryBackup && (
+                  <button
+                    onClick={handleRestoreEmergencyBackup}
+                    className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-wider bg-amber-950/40 hover:bg-amber-900/55 text-amber-400 border border-amber-900/40 py-2 rounded-lg transition-all active:scale-95 cursor-pointer animate-pulse"
+                    title="Restaurar base de datos a la versión anterior al reset"
+                  >
+                    <Undo className="w-3.5 h-3.5" />
+                    <span>Deshacer Reset</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="pt-1 text-center text-[9px] text-slate-500 font-medium">
             © 2026 Pixelitos Academy
           </div>
         </div>
@@ -745,6 +879,12 @@ export default function App() {
                 <>
                   <MessageSquare className="w-4 h-4 text-slate-600" />
                   <span>Pizarra</span>
+                </>
+              )}
+              {activeTab === 'students' && (
+                <>
+                  <Users className="w-4 h-4 text-slate-600" />
+                  <span>Alumnos / Dashboard</span>
                 </>
               )}
             </h1>
@@ -807,24 +947,28 @@ export default function App() {
 
                 <div className="flex items-center gap-2 shrink-0">
                   {/* Beautiful PDF Export Catalog button */}
-                  <button
-                    onClick={handleDownloadPDF}
-                    className="inline-flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wide bg-[#f0da4c] hover:bg-[#f0da4c]/95 text-slate-950 px-5 py-2.5 rounded-xl transition-all shadow-xs border border-amber-400/60 active:scale-95 cursor-pointer"
-                    title="Exportar listado actual a un PDF con separaciones por Nivel"
-                    id="export-pdf-btn"
-                  >
-                    <FileText className="w-4 h-4 text-slate-950" />
-                    <span>Descargar PDF 📄</span>
-                  </button>
+                  {session.role !== 'alumno' && (
+                    <button
+                      onClick={handleDownloadPDF}
+                      className="inline-flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wide bg-[#f0da4c] hover:bg-[#f0da4c]/95 text-slate-950 px-5 py-2.5 rounded-xl transition-all shadow-xs border border-amber-400/60 active:scale-95 cursor-pointer"
+                      title="Exportar listado actual a un PDF con separaciones por Nivel"
+                      id="export-pdf-btn"
+                    >
+                      <FileText className="w-4 h-4 text-slate-950" />
+                      <span>Descargar PDF 📄</span>
+                    </button>
+                  )}
 
-                  <button
-                    onClick={handleTriggerAdd}
-                    className="inline-flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wide bg-slate-950 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer shrink-0"
-                    id="add-material-btn"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Añadir Juego</span>
-                  </button>
+                  {session.role === 'admin' && (
+                    <button
+                      onClick={handleTriggerAdd}
+                      className="inline-flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wide bg-slate-950 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer shrink-0"
+                      id="add-material-btn"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Añadir Juego</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -859,21 +1003,27 @@ export default function App() {
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
                     Nivel de Academia:
                   </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(['Todos', '1°1°', '1°2°', '2°1°', '2°2°'] as const).map((lvl) => (
-                      <button
-                        key={lvl}
-                        onClick={() => setSelectedLevel(lvl)}
-                        className={`text-2xs font-bold px-3 py-1.5 rounded-lg transition-all cursor-pointer border ${
-                          selectedLevel === lvl
-                            ? 'bg-[#f0da4c] text-slate-950 border-amber-400'
-                            : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200/80'
-                        }`}
-                      >
-                        {lvl === 'Todos' ? '🎒 Todos' : `Nivel ${lvl}`}
-                      </button>
-                    ))}
-                  </div>
+                  {session.role === 'alumno' ? (
+                    <div className="bg-[#f0da4c]/10 text-slate-900 text-xs font-bold py-2 px-3.5 rounded-xl border border-amber-400/40 inline-flex items-center gap-1.5 animate-pulse">
+                      <span>🎒 Bloqueado a tu nivel: <strong>{session.studentLevel}</strong></span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {(['Todos', '1°1°', '1°2°', '2°1°', '2°2°'] as const).map((lvl) => (
+                        <button
+                          key={lvl}
+                          onClick={() => setSelectedLevel(lvl)}
+                          className={`text-2xs font-bold px-3 py-1.5 rounded-lg transition-all cursor-pointer border ${
+                            selectedLevel === lvl
+                              ? 'bg-[#f0da4c] text-slate-950 border-amber-400'
+                              : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200/80'
+                          }`}
+                        >
+                          {lvl === 'Todos' ? '🎒 Todos' : `Nivel ${lvl}`}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. Age Range filter */}
@@ -1008,8 +1158,9 @@ export default function App() {
                         key={material.id}
                         material={material}
                         onToggleFavorite={handleToggleFavorite}
-                        onEdit={handleTriggerEdit}
-                        onDelete={handleDeleteMaterial}
+                        onEdit={session.role === 'admin' ? handleTriggerEdit : undefined}
+                        onDelete={session.role === 'admin' ? handleDeleteMaterial : undefined}
+                        userRole={session.role}
                       />
                     ))}
                   </div>
@@ -1074,12 +1225,19 @@ export default function App() {
 
         {/* TAB 2: CLASS PLANNER */}
         {activeTab === 'planner' && (
-          <ClassPlanner materials={materials} />
+          <ClassPlanner
+            materials={materials}
+            userRole={session.role}
+            userLevel={session.role === 'alumno' ? session.studentLevel : undefined}
+          />
         )}
 
         {/* TAB 3: ACCOUNTS SECTION */}
         {activeTab === 'accounts' && (
-          <AccountsSection />
+          <AccountsSection
+            userRole={session.role}
+            userLevel={session.role === 'alumno' ? session.studentLevel : undefined}
+          />
         )}
 
         {/* TAB 4: RESOURCES SECTION */}
@@ -1090,6 +1248,13 @@ export default function App() {
         {/* TAB 5: TEACHER BULLETIN */}
         {activeTab === 'bulletin' && (
           <TeacherBulletin />
+        )}
+
+        {/* TAB 6: STUDENTS / TEACHER DASHBOARD */}
+        {activeTab === 'students' && (
+          <TeacherDashboard
+            userRole={session.role}
+          />
         )}
         </main>
 

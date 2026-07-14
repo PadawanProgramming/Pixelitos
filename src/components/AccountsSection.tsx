@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Key, Search, UserCheck, Plus, Trash2, Copy, Check, Filter } from 'lucide-react';
+import { LevelType, UserRole } from '../types';
 
 interface Account {
   id: string;
@@ -9,9 +10,15 @@ interface Account {
   username: string;
   password?: string;
   notes?: string;
+  level?: LevelType;
 }
 
-export const AccountsSection: React.FC = () => {
+interface AccountsSectionProps {
+  userRole?: UserRole;
+  userLevel?: LevelType;
+}
+
+export const AccountsSection: React.FC<AccountsSectionProps> = ({ userRole = 'admin', userLevel }) => {
   const [accounts, setAccounts] = useState<Account[]>(() => {
     const saved = localStorage.getItem('pixelitos_accounts');
     if (saved) {
@@ -34,15 +41,56 @@ export const AccountsSection: React.FC = () => {
       },
       {
         id: 'acc-2',
-        name: 'Licencias Estudiantes Roblox Studio Grupo A',
+        name: 'Licencias Estudiantes Roblox Studio Nivel 2°2°',
         type: 'Alumno',
         platform: 'Roblox',
-        username: 'pixelitos_estudiante_A1',
+        username: 'pixelitos_estudiante_roblox_22',
         password: 'RobloxStudent9921',
         notes: 'Compartido para los chicos de Roblox del grupo de las 18hs.',
+        level: '2°2°',
       },
       {
         id: 'acc-3',
+        name: 'Cuenta Alumnos Scratch Nivel 1°1°',
+        type: 'Alumno',
+        platform: 'Scratch',
+        username: 'pixelitos_estudiantes_11',
+        password: 'ScratchNivel11!',
+        notes: 'Cuenta compartida para guardar trabajos del Nivel 1°1°.',
+        level: '1°1°',
+      },
+      {
+        id: 'acc-4',
+        name: 'Cuenta Alumnos Scratch Nivel 1°2°',
+        type: 'Alumno',
+        platform: 'Scratch',
+        username: 'pixelitos_estudiantes_12',
+        password: 'ScratchNivel12!',
+        notes: 'Cuenta compartida para guardar trabajos del Nivel 1°2°.',
+        level: '1°2°',
+      },
+      {
+        id: 'acc-5',
+        name: 'Cuenta Alumnos Scratch Nivel 2°1°',
+        type: 'Alumno',
+        platform: 'Scratch',
+        username: 'pixelitos_estudiantes_21',
+        password: 'ScratchNivel21!',
+        notes: 'Cuenta compartida para guardar trabajos del Nivel 2°1°.',
+        level: '2°1°',
+      },
+      {
+        id: 'acc-6',
+        name: 'Licencias Micro:bit Alumnos Nivel 2°2°',
+        type: 'Alumno',
+        platform: 'Micro:bit',
+        username: 'microbit_pixelitos_22',
+        password: 'MicroBitSecureClass!',
+        notes: 'Para programar la simulación en línea del nivel de microbit avanzado.',
+        level: '2°2°',
+      },
+      {
+        id: 'acc-7',
         name: 'Cuenta Coordinadora Pixelitos',
         type: 'Profe',
         platform: 'Gmail / General',
@@ -51,7 +99,7 @@ export const AccountsSection: React.FC = () => {
         notes: 'Gmail de contacto y coordinación pedagógica general.',
       },
       {
-        id: 'acc-4',
+        id: 'acc-8',
         name: 'Kahoot PREMIUM Academia',
         type: 'Profe',
         platform: 'Kahoot',
@@ -74,6 +122,7 @@ export const AccountsSection: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [notes, setNotes] = useState('');
+  const [formLevel, setFormLevel] = useState<LevelType | 'Todos'>('Todos');
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<'user' | 'pass' | null>(null);
@@ -95,6 +144,7 @@ export const AccountsSection: React.FC = () => {
       username: username.trim(),
       password: password.trim() || undefined,
       notes: notes.trim() || undefined,
+      level: type === 'Alumno' && formLevel !== 'Todos' ? formLevel : undefined,
     };
 
     const updated = [newAcc, ...accounts];
@@ -105,6 +155,7 @@ export const AccountsSection: React.FC = () => {
     setUsername('');
     setPassword('');
     setNotes('');
+    setFormLevel('Todos');
     setShowForm(false);
   };
 
@@ -132,10 +183,17 @@ export const AccountsSection: React.FC = () => {
       acc.username.toLowerCase().includes(search.toLowerCase()) ||
       (acc.notes || '').toLowerCase().includes(search.toLowerCase());
     
-    const matchesType = typeFilter === 'Todos' || acc.type === typeFilter;
+    let matchesType = typeFilter === 'Todos' || acc.type === typeFilter;
+    let matchesLevel = true;
+
+    if (userRole === 'alumno') {
+      matchesType = acc.type === 'Alumno';
+      matchesLevel = !acc.level || acc.level === userLevel;
+    }
+
     const matchesPlatform = platformFilter === 'Todos' || acc.platform === platformFilter;
 
-    return matchesSearch && matchesType && matchesPlatform;
+    return matchesSearch && matchesType && matchesPlatform && matchesLevel;
   });
 
   return (
@@ -145,30 +203,34 @@ export const AccountsSection: React.FC = () => {
         <div>
           <h2 className="font-sans text-xl font-bold text-slate-900 flex items-center gap-2">
             <Key className="w-5 h-5 text-slate-800" />
-            Gestión de Cuentas y Accesos 🔐
+            {userRole === 'alumno' ? 'Mis Cuentas y Accesos 🔐' : 'Gestión de Cuentas y Accesos 🔐'}
           </h2>
           <p className="font-sans text-xs text-slate-500 mt-1">
-            Visualicen y organicen las credenciales compartidas para profesores y alumnos en Scratch, Roblox, Kahoots y más.
+            {userRole === 'alumno' 
+              ? 'Encontrá tus credenciales de Scratch, Roblox y Micro:bit para ingresar y guardar tus proyectos.'
+              : 'Visualicen y organicen las credenciales compartidas para profesores y alumnos en Scratch, Roblox, Kahoots y más.'}
           </p>
         </div>
 
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-lg transition-all shadow-xs cursor-pointer"
-        >
-          {showForm ? 'Cerrar' : <><Plus className="w-4 h-4" /> Agregar Cuenta</>}
-        </button>
+        {userRole !== 'alumno' && (
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-lg transition-all shadow-xs cursor-pointer"
+          >
+            {showForm ? 'Cerrar' : <><Plus className="w-4 h-4" /> Agregar Cuenta</>}
+          </button>
+        )}
       </div>
 
       {/* Add Account Form */}
-      {showForm && (
+      {showForm && userRole !== 'alumno' && (
         <form onSubmit={handleCreateAccount} className="bg-slate-50 border border-slate-200 rounded-xl p-5 mb-8 animate-fade-in space-y-4">
           <h3 className="font-sans text-sm font-bold text-slate-800 flex items-center gap-2">
             <UserCheck className="w-4 h-4 text-emerald-600" />
             Registrar Nuevas Credenciales
           </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className={`grid grid-cols-1 ${type === 'Alumno' ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-4`}>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Descripción / Nombre:</label>
               <input
@@ -191,6 +253,22 @@ export const AccountsSection: React.FC = () => {
                 <option value="Alumno">Alumno 🎒</option>
               </select>
             </div>
+            {type === 'Alumno' && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Nivel del Alumno:</label>
+                <select
+                  value={formLevel}
+                  onChange={(e) => setFormLevel(e.target.value as any)}
+                  className="w-full text-sm rounded-lg border border-slate-300 p-2.5 bg-white text-slate-800"
+                >
+                  <option value="Todos">Todos / General 🎒</option>
+                  <option value="1°1°">Nivel 1°1°</option>
+                  <option value="1°2°">Nivel 1°2°</option>
+                  <option value="2°1°">Nivel 2°1°</option>
+                  <option value="2°2°">Nivel 2°2°</option>
+                </select>
+              </div>
+            )}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Plataforma:</label>
               <select
@@ -262,7 +340,7 @@ export const AccountsSection: React.FC = () => {
 
       {/* Filters and Search controls */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
-        <div className="md:col-span-5 relative">
+        <div className={userRole === 'alumno' ? "md:col-span-8 relative" : "md:col-span-5 relative"}>
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
           <input
             type="text"
@@ -273,20 +351,22 @@ export const AccountsSection: React.FC = () => {
           />
         </div>
 
-        <div className="md:col-span-3 flex items-center gap-1.5">
-          <Filter className="w-3.5 h-3.5 text-slate-400" />
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as any)}
-            className="w-full text-xs rounded-lg border border-slate-300 p-2 bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900"
-          >
-            <option value="Todos">Todos los roles</option>
-            <option value="Profe">Profesores</option>
-            <option value="Alumno">Alumnos</option>
-          </select>
-        </div>
+        {userRole !== 'alumno' ? (
+          <div className="md:col-span-3 flex items-center gap-1.5">
+            <Filter className="w-3.5 h-3.5 text-slate-400" />
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as any)}
+              className="w-full text-xs rounded-lg border border-slate-300 p-2 bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900"
+            >
+              <option value="Todos">Todos los roles</option>
+              <option value="Profe">Profesores</option>
+              <option value="Alumno">Alumnos</option>
+            </select>
+          </div>
+        ) : null}
 
-        <div className="md:col-span-4">
+        <div className={userRole === 'alumno' ? "md:col-span-4" : "md:col-span-4"}>
           <select
             value={platformFilter}
             onChange={(e) => setPlatformFilter(e.target.value)}
@@ -382,15 +462,17 @@ export const AccountsSection: React.FC = () => {
               </div>
 
               {/* Delete Button */}
-              <div className="pt-2 border-t border-slate-100 flex justify-end">
-                <button
-                  onClick={() => handleDelete(acc.id)}
-                  className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                  title="Eliminar estas credenciales"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
+              {userRole !== 'alumno' && (
+                <div className="pt-2 border-t border-slate-100 flex justify-end">
+                  <button
+                    onClick={() => handleDelete(acc.id)}
+                    className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                    title="Eliminar estas credenciales"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
           ))
         )}

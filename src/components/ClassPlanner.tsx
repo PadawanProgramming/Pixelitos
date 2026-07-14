@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { EducationalMaterial } from '../types';
-import { Calendar, Trash2, Plus, Sparkles, AlertCircle, Bookmark, Minus, ExternalLink } from 'lucide-react';
+import { EducationalMaterial, LevelType, UserRole } from '../types';
+import { Calendar, Trash2, Plus, Sparkles, AlertCircle, Bookmark, Minus, ExternalLink, Edit, Check } from 'lucide-react';
 
 interface ClassPlan {
   id: string;
   month: string;
   targetGroup: string;
   objectives: string;
+  level?: LevelType | 'Todos';
   classIds?: string[]; // New list of classes, flexible up to 12!
+  realizedClassIds?: string[]; // To track realized classes!
   // Legacy fields to guarantee compatibility:
   class1Id?: string;
   class2Id?: string;
@@ -17,21 +19,27 @@ interface ClassPlan {
 
 interface ClassPlannerProps {
   materials: EducationalMaterial[];
+  userRole?: UserRole;
+  userLevel?: LevelType;
 }
 
-export const ClassPlanner: React.FC<ClassPlannerProps> = ({ materials }) => {
+export const ClassPlanner: React.FC<ClassPlannerProps> = ({ materials, userRole = 'admin', userLevel }) => {
   const [plans, setPlans] = useState<ClassPlan[]>(() => {
     const saved = localStorage.getItem('pixelitos_class_plans');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Ensure all plans have the classIds array
+        // Ensure all plans have the classIds array and realizedClassIds
         return parsed.map((p: any) => {
+          let updatedPlan = { ...p };
           if (!p.classIds) {
             const classIds = [p.class1Id, p.class2Id, p.class3Id, p.class4Id].filter(Boolean);
-            return { ...p, classIds };
+            updatedPlan = { ...updatedPlan, classIds };
           }
-          return p;
+          if (!updatedPlan.realizedClassIds) {
+            updatedPlan = { ...updatedPlan, realizedClassIds: [] };
+          }
+          return updatedPlan;
         });
       } catch (e) {
         console.error(e);
@@ -44,29 +52,78 @@ export const ClassPlanner: React.FC<ClassPlannerProps> = ({ materials }) => {
         month: 'Marzo - Introducción al Taller 🎮',
         targetGroup: 'Pequeños (1° 1 / 7-8 años)',
         objectives: 'Familiarizar a los chicos con la interfaz de Scratch y realizar diagnósticos de pensamiento computacional.',
+        level: '1°1°',
         classIds: ['sc-nombre-interactivo', 'kh-pensamiento-computacional', 'sc-laberinto-1'],
+        realizedClassIds: [],
       },
       {
         id: 'plan-default-2',
         month: 'Abril - Clones y Concurrentes 👥',
         targetGroup: 'Medianos (8-12 años)',
         objectives: 'Explicar la diferencia entre un objeto único y el comportamiento de copias concurrentes (Clones).',
+        level: '1°2°',
         classIds: ['sc-clones-salchi', 'kh-clones-murcielago', 'sc-condicionales-murcielago', 'sc-arkanoid'],
+        realizedClassIds: [],
       },
     ];
   });
 
   const [month, setMonth] = useState('');
   const [targetGroup, setTargetGroup] = useState('Medianos (8-12 años)');
+  const [planLevel, setPlanLevel] = useState<LevelType | 'Todos'>('Todos');
   const [objectives, setObjectives] = useState('');
   
   // Dynamic list of class IDs (start with 4 empty classes)
   const [classIds, setClassIds] = useState<string[]>(['', '', '', '']);
   const [showForm, setShowForm] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<ClassPlan | null>(null);
 
   const savePlans = (newPlans: ClassPlan[]) => {
     setPlans(newPlans);
     localStorage.setItem('pixelitos_class_plans', JSON.stringify(newPlans));
+  };
+
+  const toggleClassRealized = (planId: string, classId: string) => {
+    if (userRole === 'alumno') return;
+    const updated = plans.map((p) => {
+      if (p.id === planId) {
+        const currentRealized = p.realizedClassIds || [];
+        const isAlreadyRealized = currentRealized.includes(classId);
+        const newRealized = isAlreadyRealized
+          ? currentRealized.filter((id) => id !== classId)
+          : [...currentRealized, classId];
+        return { ...p, realizedClassIds: newRealized };
+      }
+      return p;
+    });
+    savePlans(updated);
+  };
+
+  const handleStartEditPlan = (plan: ClassPlan) => {
+    setEditingPlan(plan);
+    setMonth(plan.month);
+    setTargetGroup(plan.targetGroup);
+    setPlanLevel(plan.level || 'Todos');
+    setObjectives(plan.objectives);
+    
+    // Pad class IDs to at least 4
+    const pClassIds = plan.classIds || [];
+    const padded = [...pClassIds];
+    while (padded.length < 4) {
+      padded.push('');
+    }
+    setClassIds(padded);
+    setShowForm(true);
+  };
+
+  const handleCancelForm = () => {
+    setEditingPlan(null);
+    setMonth('');
+    setObjectives('');
+    setPlanLevel('Todos');
+    setTargetGroup('Medianos (8-12 años)');
+    setClassIds(['', '', '', '']);
+    setShowForm(false);
   };
 
   const handleAddPlan = (e: React.FormEvent) => {
@@ -76,20 +133,42 @@ export const ClassPlanner: React.FC<ClassPlannerProps> = ({ materials }) => {
     // Filter out any unselected classes to keep database clean
     const activeClassIds = classIds.filter(id => id !== '');
 
-    const newPlan: ClassPlan = {
-      id: `plan-${Date.now()}`,
-      month: month.trim(),
-      targetGroup,
-      objectives: objectives.trim(),
-      classIds: activeClassIds,
-    };
+    let updated: ClassPlan[];
+    if (editingPlan) {
+      updated = plans.map((p) => {
+        if (p.id === editingPlan.id) {
+          return {
+            ...p,
+            month: month.trim(),
+            targetGroup,
+            objectives: objectives.trim(),
+            level: planLevel,
+            classIds: activeClassIds,
+          };
+        }
+        return p;
+      });
+      setEditingPlan(null);
+    } else {
+      const newPlan: ClassPlan = {
+        id: `plan-${Date.now()}`,
+        month: month.trim(),
+        targetGroup,
+        objectives: objectives.trim(),
+        level: planLevel,
+        classIds: activeClassIds,
+        realizedClassIds: [],
+      };
+      updated = [newPlan, ...plans];
+    }
 
-    const updated = [newPlan, ...plans];
     savePlans(updated);
 
     // Reset form
     setMonth('');
     setObjectives('');
+    setPlanLevel('Todos');
+    setTargetGroup('Medianos (8-12 años)');
     setClassIds(['', '', '', '']);
     setShowForm(false);
   };
@@ -118,47 +197,74 @@ export const ClassPlanner: React.FC<ClassPlannerProps> = ({ materials }) => {
     }
   };
 
+  const visiblePlans = plans.filter((plan) => {
+    if (userRole === 'alumno') {
+      if (plan.level) {
+        return plan.level === userLevel || plan.level === 'Todos';
+      }
+      // Safeguard fallback:
+      if (userLevel === '1°1°') {
+        return plan.targetGroup.includes('Pequeños') || plan.targetGroup.includes('Todos');
+      } else {
+        return plan.targetGroup.includes('Medianos') || plan.targetGroup.includes('Todos');
+      }
+    }
+    return true; // Teachers and Admins see everything
+  });
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs" id="class-planner-section">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
           <h2 className="font-sans text-xl font-bold text-slate-900 flex items-center gap-2">
             <Calendar className="w-5 h-5 text-slate-800" />
-            Planificación de Clases 📅
+            {userRole === 'alumno' ? 'Mi Recorrido de Clases 📅' : 'Planificación de Clases 📅'}
           </h2>
           <p className="font-sans text-xs text-slate-500 mt-1">
-            Armen el recorrido pedagógico seleccionando los desafíos correspondientes. ¡Admite desde 1 hasta 12 clases por plan!
+            {userRole === 'alumno' 
+              ? `Revisá el recorrido de desafíos y proyectos programados para tu nivel (${userLevel}).`
+              : 'Armen el recorrido pedagógico seleccionando los desafíos correspondientes. ¡Admite desde 1 hasta 12 clases por plan!'}
           </p>
         </div>
 
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-lg transition-all shadow-xs cursor-pointer"
-        >
-          {showForm ? 'Cerrar' : <><Plus className="w-4 h-4" /> Crear Planificación</>}
-        </button>
+        {userRole !== 'alumno' && (
+          <button
+            onClick={() => {
+              if (showForm) {
+                handleCancelForm();
+              } else {
+                setShowForm(true);
+              }
+            }}
+            className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-lg transition-all shadow-xs cursor-pointer"
+          >
+            {showForm ? 'Cerrar Formulario' : <><Plus className="w-4 h-4" /> Crear Planificación</>}
+          </button>
+        )}
       </div>
 
       {/* Rules Banner for coordination */}
-      <div className="mb-6 bg-pixelitos-yellow-light/20 rounded-xl p-4 border border-pixelitos-yellow-dark/30 flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-slate-700 shrink-0 mt-0.5" />
-        <div className="text-xs text-slate-700 leading-relaxed">
-          <strong className="font-sans font-extrabold text-slate-900 block mb-0.5">Indicación del Equipo:</strong>
-          <span>El taller varía de duración según el mes o la escuela. Podés agregar clases dinámicamente según lo requiera el curso (por ejemplo, talleres intensivos con hasta 12 proyectos semanales o quincenales).</span>
+      {userRole !== 'alumno' && (
+        <div className="mb-6 bg-pixelitos-yellow-light/20 rounded-xl p-4 border border-pixelitos-yellow-dark/30 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-slate-700 shrink-0 mt-0.5" />
+          <div className="text-xs text-slate-700 leading-relaxed">
+            <strong className="font-sans font-extrabold text-slate-900 block mb-0.5">Indicación del Equipo:</strong>
+            <span>El taller varía de duración según el mes o la escuela. Podés agregar clases dinámicamente según lo requiera el curso (por ejemplo, talleres intensivos con hasta 12 proyectos semanales o quincenales).</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Add Plan Form */}
-      {showForm && (
+      {showForm && userRole !== 'alumno' && (
         <form onSubmit={handleAddPlan} className="bg-slate-50 border border-slate-200 rounded-xl p-5 mb-8 animate-fade-in">
           <h3 className="font-sans text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-amber-500" />
-            Configurar Planificación Flexible
+            {editingPlan ? 'Editar Planificación' : 'Configurar Planificación Flexible'}
           </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Nombre de la Planificación (ej: Julio - Robótica Avanzada):</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Nombre de la Planificación:</label>
               <input
                 type="text"
                 value={month}
@@ -178,6 +284,20 @@ export const ClassPlanner: React.FC<ClassPlannerProps> = ({ materials }) => {
                 <option value="Pequeños (1° 1 / 7-8 años)">Pequeños (1° 1 / 7-8 años)</option>
                 <option value="Medianos (8-12 años)">Medianos (8-12 años)</option>
                 <option value="Todos / General">Todos / General</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Nivel de la Academia:</label>
+              <select
+                value={planLevel}
+                onChange={(e) => setPlanLevel(e.target.value as any)}
+                className="w-full text-sm rounded-lg border border-slate-300 p-2.5 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900"
+              >
+                <option value="Todos">Todos / General 🎒</option>
+                <option value="1°1°">Nivel 1°1°</option>
+                <option value="1°2°">Nivel 1°2°</option>
+                <option value="2°1°">Nivel 2°1°</option>
+                <option value="2°2°">Nivel 2°2°</option>
               </select>
             </div>
           </div>
@@ -246,7 +366,7 @@ export const ClassPlanner: React.FC<ClassPlannerProps> = ({ materials }) => {
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={handleCancelForm}
               className="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 cursor-pointer"
             >
               Cancelar
@@ -255,7 +375,7 @@ export const ClassPlanner: React.FC<ClassPlannerProps> = ({ materials }) => {
               type="submit"
               className="bg-slate-950 hover:bg-slate-900 text-white font-bold text-xs px-5 py-2 rounded-lg transition-colors cursor-pointer"
             >
-              Guardar Planificación
+              {editingPlan ? 'Guardar Cambios' : 'Guardar Planificación'}
             </button>
           </div>
         </form>
@@ -263,14 +383,18 @@ export const ClassPlanner: React.FC<ClassPlannerProps> = ({ materials }) => {
 
       {/* Grid of existing plans */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {plans.length === 0 ? (
+        {visiblePlans.length === 0 ? (
           <div className="col-span-full text-center py-12 text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
             <Calendar className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-            <p className="font-sans text-sm">No hay planificaciones creadas aún. ¡Crea el primer plan arriba!</p>
+            <p className="font-sans text-sm">No hay planificaciones creadas aún para tu nivel.</p>
           </div>
         ) : (
-          plans.map((plan) => {
+          visiblePlans.map((plan) => {
             const listIds = plan.classIds || [];
+            const realizedCount = listIds.filter(id => plan.realizedClassIds?.includes(id)).length;
+            const totalClasses = listIds.length;
+            const progressPercent = totalClasses > 0 ? Math.round((realizedCount / totalClasses) * 100) : 0;
+
             return (
               <div
                 key={plan.id}
@@ -283,21 +407,49 @@ export const ClassPlanner: React.FC<ClassPlannerProps> = ({ materials }) => {
                 <div>
                   {/* Plan Header */}
                   <div className="flex items-start justify-between gap-2 mb-3 pl-2">
-                    <div>
+                    <div className="flex-1">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-900 bg-pixelitos-yellow/45 border border-pixelitos-yellow-dark/30 px-2.5 py-0.5 rounded">
-                        {plan.targetGroup}
+                        {plan.targetGroup} {plan.level ? `(${plan.level})` : ''}
                       </span>
                       <h4 className="font-sans text-base font-bold text-slate-900 mt-1.5 leading-snug">
                         {plan.month}
                       </h4>
+
+                      {/* Progress Bar */}
+                      {totalClasses > 0 && (
+                        <div className="mt-3 mb-1">
+                          <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold mb-1">
+                            <span>Progreso de Clases</span>
+                            <span>{realizedCount} de {totalClasses} ({progressPercent}%)</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/50">
+                            <div 
+                              className="h-full bg-emerald-500 transition-all duration-500" 
+                              style={{ width: `${progressPercent}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <button
-                      onClick={() => handleDeletePlan(plan.id)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
-                      title="Eliminar este plan"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {userRole !== 'alumno' && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditPlan(plan)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors cursor-pointer"
+                          title="Editar planificación"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeletePlan(plan.id)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                          title="Eliminar este plan"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Plan Objectives */}
@@ -359,6 +511,7 @@ export const ClassPlanner: React.FC<ClassPlannerProps> = ({ materials }) => {
                           const materialLevel = material ? material.level : '';
                           const materialDiff = material ? material.difficulty : '';
                           const materialUrl = material ? material.url : '';
+                          const isRealized = plan.realizedClassIds?.includes(classId) || false;
 
                           return (
                             <div key={idx} className="relative flex items-stretch gap-3 pb-2 last:pb-0">
@@ -373,11 +526,40 @@ export const ClassPlanner: React.FC<ClassPlannerProps> = ({ materials }) => {
                               </div>
 
                               {/* Station Mini-Card */}
-                              <div className="flex-1 bg-slate-50/70 hover:bg-slate-50 border border-slate-200/60 rounded-xl p-2.5 transition-all flex flex-col md:flex-row md:items-center justify-between gap-2 shadow-3xs">
-                                <div className="flex items-start gap-2 truncate">
+                              <div className={`flex-1 border transition-all flex flex-col md:flex-row md:items-center justify-between gap-2 shadow-3xs p-2.5 rounded-xl ${
+                                isRealized 
+                                  ? 'bg-emerald-50/30 hover:bg-emerald-50/40 border-emerald-200/60' 
+                                  : 'bg-slate-50/70 hover:bg-slate-50 border-slate-200/60'
+                              }`}>
+                                <div className="flex items-start gap-2.5 truncate">
+                                  {/* Checkbox for realized */}
+                                  {userRole !== 'alumno' ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleClassRealized(plan.id, classId)}
+                                      className={`shrink-0 mt-0.5 w-4 h-4 rounded border transition-all flex items-center justify-center cursor-pointer ${
+                                        isRealized 
+                                          ? 'bg-emerald-500 border-emerald-600 text-white' 
+                                          : 'border-slate-300 hover:border-slate-400 bg-white'
+                                      }`}
+                                      title={isRealized ? "Marcar como pendiente" : "Marcar como realizado"}
+                                      id={`toggle-realized-${plan.id}-${classId}`}
+                                    >
+                                      {isRealized && <Check className="w-3 h-3 stroke-[3]" />}
+                                    </button>
+                                  ) : (
+                                    isRealized && (
+                                      <span className="shrink-0 mt-0.5 flex items-center justify-center w-4 h-4 rounded bg-emerald-500 text-white" title="¡Realizado!">
+                                        <Check className="w-3 h-3 stroke-[3]" />
+                                      </span>
+                                    )
+                                  )}
+
                                   <span className="text-base shrink-0 mt-0.5">{emoji}</span>
                                   <div className="truncate">
-                                    <h5 className="font-sans font-bold text-[11px] text-slate-800 leading-snug truncate" title={materialTitle}>
+                                    <h5 className={`font-sans font-bold text-[11px] leading-snug truncate ${
+                                      isRealized ? 'text-slate-500 line-through font-medium' : 'text-slate-800'
+                                    }`} title={materialTitle}>
                                       {materialTitle}
                                     </h5>
                                     

@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { EducationalMaterial, enrichMaterial } from '../types';
-import { ExternalLink, Star, Copy, Check, Edit2, BookOpen, AlertCircle, ShieldAlert } from 'lucide-react';
+import { EducationalMaterial, enrichMaterial, UserRole } from '../types';
+import { ExternalLink, Star, Copy, Check, Edit2, BookOpen, AlertCircle, ShieldAlert, Share2 } from 'lucide-react';
 
 interface MaterialCardProps {
   material: EducationalMaterial;
   onToggleFavorite: (id: string) => void;
-  onEdit: (material: EducationalMaterial) => void;
-  onDelete: (id: string) => void;
+  onEdit?: (material: EducationalMaterial) => void;
+  onDelete?: (id: string) => void;
+  userRole?: UserRole;
 }
 
 export const MaterialCard: React.FC<MaterialCardProps> = ({
@@ -14,11 +15,23 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
   onToggleFavorite,
   onEdit,
   onDelete,
+  userRole,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [shared, setShared] = useState(false);
   const [showRuleWarning, setShowRuleWarning] = useState(false);
+  const [showShareNotice, setShowShareNotice] = useState(false);
 
   const enriched = enrichMaterial(material);
+
+  const handleShare = () => {
+    const shareUrl = `${window.location.origin}${window.location.pathname}?share=${enriched.id}`;
+    navigator.clipboard.writeText(shareUrl);
+    setShared(true);
+    setShowShareNotice(true);
+    setTimeout(() => setShared(false), 2000);
+    setTimeout(() => setShowShareNotice(false), 4000);
+  };
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(material.url);
@@ -196,45 +209,78 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
         </div>
       )}
 
+      {/* Copied Share Notice */}
+      {showShareNotice && (
+        <div className="absolute inset-x-4 top-16 bg-slate-950 text-white rounded-xl p-4 shadow-xl border border-slate-900 flex items-start gap-3.5 text-xs z-10 animate-fade-in">
+          <Share2 className="w-5 h-5 shrink-0 text-purple-400 animate-bounce" />
+          <div>
+            <strong className="block font-sans text-purple-400 font-extrabold text-sm mb-0.5">¡Ficha Compartida! 🎵</strong>
+            <span className="text-slate-300">¡Enlace Spotify-style copiado al portapapeles! Compartilo con familias para que puedan ver los logros de forma interactiva.</span>
+          </div>
+        </div>
+      )}
+
       {/* Bottom section: Action Links */}
       <div className="mt-auto pt-4 border-t border-slate-100 flex flex-wrap gap-2 items-center justify-between">
         {/* Secondary controls (Edit, Delete) */}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => onEdit(enriched)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-            title="Editar material / Añadir notas"
-            id={`edit-btn-${enriched.id}`}
-          >
-            <Edit2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => onDelete(enriched.id)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
-            title="Eliminar material"
-            id={`del-btn-${enriched.id}`}
-          >
-            <span className="text-sm font-bold leading-none">×</span>
-          </button>
-        </div>
+        {onEdit && onDelete && userRole !== 'alumno' ? (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => onEdit(enriched)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Editar material / Añadir notas"
+              id={`edit-btn-${enriched.id}`}
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => onDelete(enriched.id)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+              title="Eliminar material"
+              id={`del-btn-${enriched.id}`}
+            >
+              <span className="text-sm font-bold leading-none">×</span>
+            </button>
+          </div>
+        ) : (
+          <div />
+        )}
 
         {/* Action Buttons */}
-        <div className="flex gap-1.5 items-center">
-          <button
-            onClick={handleCopyLink}
-            className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
-              copied
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 shadow-2xs'
-            }`}
-            title="Copiar URL para los alumnos"
-            id={`copy-btn-${enriched.id}`}
-          >
-            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copied ? '¡Copiado!' : 'Copiar URL'}</span>
-          </button>
+        <div className="flex gap-1.5 items-center flex-wrap">
+          {userRole !== 'alumno' && (
+            <>
+              <button
+                onClick={handleShare}
+                className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
+                  shared
+                    ? 'bg-purple-50 text-purple-700 border-purple-200'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 shadow-2xs'
+                }`}
+                title="Compartir juego con ficha de Spotify-style"
+                id={`share-btn-${enriched.id}`}
+              >
+                {shared ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5 text-purple-500" />}
+                <span>{shared ? '¡Compartido!' : 'Compartir'}</span>
+              </button>
 
-          {enriched.editorUrl && (
+              <button
+                onClick={handleCopyLink}
+                className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
+                  copied
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 shadow-2xs'
+                }`}
+                title="Copiar URL para los alumnos"
+                id={`copy-btn-${enriched.id}`}
+              >
+                {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copied ? '¡Copiado!' : 'Copiar URL'}</span>
+              </button>
+            </>
+          )}
+
+          {enriched.editorUrl && userRole !== 'alumno' && (
             <a
               href={enriched.editorUrl}
               target="_blank"
@@ -255,7 +301,7 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
             className="inline-flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded-lg bg-pixelitos-yellow hover:bg-pixelitos-yellow-dark text-slate-950 border border-pixelitos-yellow-dark/50 transition-all shadow-xs"
             id={`open-link-${enriched.id}`}
           >
-            <span>Lanzar</span>
+            <span>{userRole === 'alumno' ? 'Lanzar Juego 🎮' : 'Lanzar'}</span>
             <ExternalLink className="w-3 h-3" />
           </a>
         </div>
