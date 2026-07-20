@@ -48,7 +48,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
   const [teacherPass, setTeacherPass] = useState('');
   const [adminPass, setAdminPass] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const [showHelper, setShowHelper] = useState(true);
   
   const [dbStudents, setDbStudents] = useState<StudentProfile[]>([]);
   const [dbTeachers, setDbTeachers] = useState<TeacherProfile[]>([]);
@@ -356,52 +355,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
               </button>
             </form>
           )}
-
-          {/* Clean Interactive Helper Panel */}
-          <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-2">
-            <button 
-              type="button"
-              onClick={() => setShowHelper(!showHelper)}
-              className="w-full flex items-center justify-between text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
-            >
-              <span className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide">
-                <HelpCircle className="w-3.5 h-3.5 text-amber-500" />
-                Guía de demostración (Test)
-              </span>
-              <span className="text-[10px] font-bold text-slate-400 underline uppercase tracking-tight">
-                {showHelper ? 'Ocultar' : 'Mostrar'}
-              </span>
-            </button>
-
-            {showHelper && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[10px] text-slate-500 font-sans leading-normal pt-1 border-t border-slate-200/60 animate-fade-in">
-                <div className="space-y-1.5">
-                  <p className="font-bold text-slate-700">🎒 Contraseñas Alumnos:</p>
-                  <ul className="list-disc list-inside space-y-0.5">
-                    {allStudents.map((st) => (
-                      <li key={st.id}>
-                        <span className="font-semibold text-slate-600">{st.name}</span>: <code className="bg-slate-200 px-1 py-0.5 rounded font-mono font-bold text-slate-800">{st.password}</code> <span className="text-[9px] text-slate-400">({st.level})</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="space-y-1.5 md:pl-2 md:border-l border-slate-200/60">
-                  <p className="font-bold text-slate-700">🔑 Personal / Staff:</p>
-                  <ul className="space-y-1">
-                    <li>
-                      🍎 Profesor: <code className="bg-slate-200 px-1 py-0.5 rounded font-mono font-bold text-slate-800">profe2026</code>
-                    </li>
-                    <li>
-                      💻 Administrador: <code className="bg-slate-200 px-1 py-0.5 rounded font-mono font-bold text-slate-800">admin2026</code>
-                    </li>
-                  </ul>
-                  <p className="text-[9px] text-slate-400 mt-1">
-                    * Podés dar de alta, modificar o borrar alumnos en el panel de administrador/profesor.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
 
         </div>
       </main>

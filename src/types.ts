@@ -6,6 +6,7 @@ export type ToolType =
   | 'Tynker'
   | 'Code.org'
   | 'Pilas Bloques'
+  | 'Minecraft Education'
   | 'Recursos y Guías';
 
 export type AgeGroupType =

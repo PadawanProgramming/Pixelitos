@@ -107,6 +107,15 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
           badgeBg: 'bg-blue-100 text-blue-800 border border-blue-200/50',
           icon: '👾',
         };
+      case 'Minecraft Education':
+        return {
+          bg: 'bg-emerald-50/50 hover:bg-emerald-50',
+          border: 'border-emerald-200/85',
+          accent: 'bg-emerald-600',
+          text: 'text-emerald-700',
+          badgeBg: 'bg-emerald-100 text-emerald-800 border border-emerald-200/50',
+          icon: '⛏️',
+        };
       default:
         return {
           bg: 'bg-slate-50/50 hover:bg-slate-50',
@@ -214,8 +223,8 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
         <div className="absolute inset-x-4 top-16 bg-slate-950 text-white rounded-xl p-4 shadow-xl border border-slate-900 flex items-start gap-3.5 text-xs z-10 animate-fade-in">
           <Share2 className="w-5 h-5 shrink-0 text-purple-400 animate-bounce" />
           <div>
-            <strong className="block font-sans text-purple-400 font-extrabold text-sm mb-0.5">¡Ficha Compartida! 🎵</strong>
-            <span className="text-slate-300">¡Enlace Spotify-style copiado al portapapeles! Compartilo con familias para que puedan ver los logros de forma interactiva.</span>
+            <strong className="block font-sans text-purple-400 font-extrabold text-sm mb-0.5">¡Enlace Copiado! 🔗</strong>
+            <span className="text-slate-300">Enlace copiado en el portapapeles que esperas para compartir tu juego</span>
           </div>
         </div>
       )}
@@ -301,7 +310,7 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
             className="inline-flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded-lg bg-pixelitos-yellow hover:bg-pixelitos-yellow-dark text-slate-950 border border-pixelitos-yellow-dark/50 transition-all shadow-xs"
             id={`open-link-${enriched.id}`}
           >
-            <span>{userRole === 'alumno' ? 'Lanzar Juego 🎮' : 'Lanzar'}</span>
+            <span>{userRole === 'alumno' ? 'Abrir Juego 🎮' : 'Abrir'}</span>
             <ExternalLink className="w-3 h-3" />
           </a>
         </div>

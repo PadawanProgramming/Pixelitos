@@ -49,7 +49,7 @@ const TUTORIAL_STEPS = [
     title: "🎮 Catálogo y Buscador de Proyectos",
     content: "Explorá nuestro catálogo con más de 100 proyectos reales listos para dar en clase (Scratch, Pilas Bloques, Roblox, Minecraft, etc). Podés filtrar por herramienta, edad, nivel de los alumnos o dificultad, y buscar por palabras clave.",
     tab: "repository",
-    tip: "Hacé clic en 'Lanzar' para abrir la actividad en clase, 'Copiar URL' para enviarla en un clic, o la estrella para guardarla en tus favoritos personales."
+    tip: "Hacé clic en 'Abrir' para abrir la actividad en clase, 'Copiar URL' para enviarla en un clic, o la estrella para guardarla en tus favoritos personales."
   },
   {
     title: "📝 Planificador Semanal Interactivo",
@@ -727,7 +727,7 @@ export default function App() {
               >
                 <span className="flex items-center gap-3">
                   <Users className="w-4 h-4 shrink-0" />
-                  <span>Alumnos / Dashboard 👥</span>
+                  <span>Dashboard</span>
                 </span>
               </button>
             </>
@@ -922,7 +922,7 @@ export default function App() {
               {activeTab === 'students' && (
                 <>
                   <Users className="w-4 h-4 text-slate-600" />
-                  <span>Alumnos / Dashboard</span>
+                  <span>Dashboard</span>
                 </>
               )}
             </h1>
@@ -1016,7 +1016,7 @@ export default function App() {
                   Plataforma / Herramienta:
                 </span>
                 <div className="flex flex-wrap gap-1.5">
-                  {(['Todos', 'Scratch', 'Kahoot', 'Roblox Studio', 'Micro:bit', 'Tynker', 'Code.org', 'Pilas Bloques', 'Recursos y Guías'] as const).map((t) => (
+                  {(['Todos', 'Scratch', 'Kahoot', 'Roblox Studio', 'Micro:bit', 'Tynker', 'Code.org', 'Pilas Bloques', 'Minecraft Education', 'Recursos y Guías'] as const).map((t) => (
                     <button
                       key={t}
                       onClick={() => setSelectedTool(t)}
@@ -1111,11 +1111,7 @@ export default function App() {
               </div>
 
               {/* Sorting Row */}
-              <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                <div className="text-xs text-slate-400 font-semibold italic">
-                  Filtros activos reducen la búsqueda antes de descargar tu PDF
-                </div>
-                
+              <div className="flex items-center justify-end pt-4 border-t border-slate-100">
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     Ordenar por:

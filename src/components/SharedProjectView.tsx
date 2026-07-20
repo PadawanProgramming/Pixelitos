@@ -122,6 +122,19 @@ export const SharedProjectView: React.FC<SharedProjectViewProps> = ({
           consoleLabel: 'PILAS BLOQUES v2',
           icon: '👾',
         };
+      case 'Minecraft Education':
+        return {
+          fromColor: 'from-emerald-600/35',
+          toColor: 'to-emerald-950',
+          accentColor: 'bg-emerald-600',
+          textColor: 'text-emerald-400',
+          borderColor: 'border-emerald-500/30',
+          hoverBorderColor: 'group-hover:border-emerald-400',
+          glowColor: 'shadow-emerald-500/20',
+          bannerGradient: 'bg-gradient-to-br from-emerald-400 to-teal-600',
+          consoleLabel: 'MINECRAFT EDUCATION',
+          icon: '⛏️',
+        };
       default:
         return {
           fromColor: 'from-purple-600/35',
