@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" shape-rendering="crispEdges">
+  <!-- Cute pixel coding block with smile for Pixelitos -->
+  <!-- Outer border/frame -->
+  <rect x="2" y="2" width="28" height="28" rx="6" fill="#0f172a" />
+  <!-- Main yellow block body -->
+  <rect x="4" y="4" width="24" height="24" rx="4" fill="#f0da4c" />
+  <!-- Cute Eyes -->
+  <rect x="8" y="10" width="3" height="4" fill="#0f172a" />
+  <rect x="21" y="10" width="3" height="4" fill="#0f172a" />
+  <!-- Blushing cheeks -->
+  <rect x="5" y="14" width="3" height="2" fill="#f43f5e" />
+  <rect x="24" y="14" width="3" height="2" fill="#f43f5e" />
+  <!-- Pixelated Happy Smile -->
+  <rect x="11" y="17" width="10" height="2" fill="#0f172a" />
+  <rect x="10" y="15" width="2" height="2" fill="#0f172a" />
+  <rect x="20" y="15" width="2" height="2" fill="#0f172a" />
+</svg>

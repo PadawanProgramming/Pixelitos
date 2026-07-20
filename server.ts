@@ -7,22 +7,42 @@ import { INITIAL_MATERIALS } from "./src/data/initialMaterials";
 
 dotenv.config();
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
+
+function resolveDatabaseUrl(): string {
+  return (
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    ""
+  );
+}
+
+function createSqlClient(connectionString: string) {
+  // Neon pooler (PgBouncer) requires prepare: false for reliable queries.
+  return postgres(connectionString, {
+    ssl: "require",
+    prepare: false,
+    max: process.env.VERCEL ? 1 : 10,
+    idle_timeout: 20,
+    connect_timeout: 15,
+    onnotice: () => {},
+  });
+}
 
 async function startServer() {
   const app = express();
   app.use(express.json());
 
-  // Initialize postgres connection
-  const DATABASE_URL = process.env.DATABASE_URL;
+  const DATABASE_URL = resolveDatabaseUrl();
   if (!DATABASE_URL) {
-    console.error("CRITICAL ERROR: DATABASE_URL is not defined in environment.");
+    console.error(
+      "CRITICAL ERROR: DATABASE_URL (or POSTGRES_URL) is not defined in environment."
+    );
     process.exit(1);
   }
 
-  const sql = postgres(DATABASE_URL, {
-    ssl: "require",
-  });
+  const sql = createSqlClient(DATABASE_URL);
 
   // DB initialization helper
   async function initDb() {
@@ -277,11 +297,21 @@ async function startServer() {
       console.log("Database seeded successfully.");
     } catch (error) {
       console.error("Error during database initialization/seeding:", error);
+      throw error;
     }
   }
 
   // Call the DB init helper
   await initDb();
+
+  app.get("/api/health", async (_req, res) => {
+    try {
+      await sql`SELECT 1`;
+      res.json({ ok: true, database: "connected" });
+    } catch (err: any) {
+      res.status(503).json({ ok: false, database: "disconnected", error: err.message });
+    }
+  });
 
   // Mappers
   function mapStudentFromDb(row: any) {
@@ -696,9 +726,20 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  return app;
+}
+
+const appPromise = startServer().catch((error) => {
+  console.error("Failed to start server:", error);
+  process.exit(1);
+});
+
+if (!process.env.VERCEL) {
+  appPromise.then((app) => {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
   });
 }
 
-startServer();
+export default appPromise;
